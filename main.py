@@ -25,16 +25,46 @@ def load_messages(path):
 
 def decode(s):
     try:
+        #res = unidecode(unicode(s,encoding='latin1'),decode='utf8')
         res = s.encode('latin1','ignore').decode('utf8')
     except:
         res = ''
     return res
 
-def display_message_disparity(messages,start='1000-01-01',end='2100-01-01'):
+def get_signature(timescale):
+    if timescale == DAILY:
+        return '%Y-%m-%d'
+    if timescale == WEEKLY:
+        return '%Y-%m-%w'
+    if timescale == MONTHLY:
+        return '%Y-%m'
+    if timescale == YEARLY:
+        return '%Y'
+    raise ValueError('Timescale incorrect')
+
+def plot_time(values,timescale,start,end,defaultValue = 0,title = ''):
+    time = []
+    signature = get_signature(timescale)
+    for dt in rrule(timescale,dtstart=start,until=end):
+        time.append(dt)
+    Y = []
+    for t in time:
+        if t.strftime(signature) in values:
+            Y.append(values[t.strftime(signature)])
+        else:
+            Y.append(defaultValue)
+    fig,ax = plt.subplots()
+    ax.bar(time,Y,width=10)
+    fig.autofmt_xdate()
+    #plt.xticks(range(len(time)),time,rotation='vertical')
+    plt.title(title)
+    plt.show()
+
+def display_message_disparity(messages,start=None,end=None,sampleTime=MONTHLY):
     count = {}
     participants = []
-    start = datetime.datetime.strptime(start,'%Y-%m-%d')
-    end = datetime.datetime.strptime(end,'%Y-%m-%d')
+    signature = get_signature(sampleTime)
+    start,end = get_start_end(messages,start,end,signature)
     for msg in messages:
         if 'content' in msg:
             date = datetime.datetime.fromtimestamp(msg['timestamp_ms']/1000.0)
@@ -42,20 +72,20 @@ def display_message_disparity(messages,start='1000-01-01',end='2100-01-01'):
                 continue
             if date > end:
                 break
-            sampleTime = date.strftime('%Y-%m-%d')
+            sample = date.strftime(signature)
             name = decode(msg['sender_name'])
             if not name in participants:
                 participants.append(name)
-            if not sampleTime in count:
-                count[sampleTime] = {}
-            if not name in count[sampleTime]:
-                count[sampleTime][name]=0
+            if not sample in count:
+                count[sample] = {}
+            if not name in count[sample]:
+                count[sample][name]=0
             content = decode(msg['content'])
             contentNoPunct = content.translate(str.maketrans('', '', string.punctuation))
             words = contentNoPunct.strip(' ').split(' ')
-            count[sampleTime][name] += len(words)
+            count[sample][name] += len(words)
     time = sorted(list(count.keys()))
-    differences = []
+    differences = {}
     for t in time:
         A = participants[0]
         B = participants[1]
@@ -68,21 +98,23 @@ def display_message_disparity(messages,start='1000-01-01',end='2100-01-01'):
             Bcount = sample[B]
         else:
             Bcount = 0
-        differences.append(Acount-Bcount)
-    plt.bar(range(len(time)),differences)
-    plt.xticks(range(len(time)),time,rotation='vertical')
-    plt.title(f'Graphe de la différence du nombre de mots de {participants[0]} - {participants[1]} par mois')
-    plt.show()
-
-def display_word_count(messages,start=None,end=None,sampleTime='day'):
+        differences[t]=(Acount-Bcount)
+    plot_time(differences,sampleTime,start,end)
+def get_start_end(data,start,end,signature):
     if not start:
-        start = datetime.datetime.fromtimestamp(messages[0]['timestamp_ms']/1000.0)
+        start = datetime.datetime.fromtimestamp(data[0]['timestamp_ms']/1000.0)
     else:
-        start = datetime.datetime.strptime(start,'%Y-%m-%d')
+        start = datetime.datetime.strptime(start,signature)
     if not end:
-        end = datetime.datetime.fromtimestamp(messages[-1]['timestamp_ms']/1000.0)
+        end = datetime.datetime.fromtimestamp(data[-1]['timestamp_ms']/1000.0)
     else:
-        end = datetime.datetime.strptime(end,'%Y-%m-%d')
+        end = datetime.datetime.strptime(end,signature)
+    return(start,end)
+
+
+def display_word_count(messages,start=None,end=None,sampleTime=MONTHLY):
+    signature = get_signature(sampleTime)
+    start,end = get_start_end(messages,start,end,signature)
     count = {}
     for msg in messages:
         if 'content' in msg:
@@ -91,21 +123,14 @@ def display_word_count(messages,start=None,end=None,sampleTime='day'):
                 continue
             if date > end:
                 break
-            sampleTime = date.strftime('%Y-%m')
-            if not sampleTime in count:
-                count[sampleTime] = 0
+            sample = date.strftime(signature)
+            if not sample in count:
+                count[sample] = 0
             content = decode(msg['content'])
             contentNoPunct = content.translate(str.maketrans('', '', string.punctuation))
             words = contentNoPunct.strip(' ').split(' ')
-            count[sampleTime] += len(words)
-    time = []
-    for dt in rrule(MONTHLY,dtstart=start,until=end):
-        time.append(dt.strftime("%Y-%m"))
-    counts = [count[t] if t in count else 0 for t in time]
-
-    plt.bar(time,counts)
-    plt.xticks(range(len(time)),time,rotation='vertical')
-    plt.show()
+            count[sample] += len(words)
+    plot_time(count,sampleTime,start,end)
 
 def total_word_count(messages):
     total = 0
@@ -143,11 +168,11 @@ def search_keyword_random(messages,keyword=None):
 
 data = load_messages(path)
 
-#display_word_count(data)
-while True:
-    word = str(input())
-    print(search_keyword_random(data,word))
-
+#display_message_disparity(data)
 #while True:
-#    print(random_message(data))
-#    input()
+#    word = str(input())
+#    print(search_keyword_random(data,word))
+
+while True:
+    print(random_message(data))
+    input()

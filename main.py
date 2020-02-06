@@ -7,7 +7,7 @@ import re
 import matplotlib.pyplot as plt
 from dateutil.rrule import rrule,DAILY,MONTHLY,YEARLY,WEEKLY
 import random
-path = 'data\\messages\\inbox\\AliseGilot_A6kYU9nD4A'
+path = ''
 cache = []
 
 def load_messages(path):

@@ -7,7 +7,7 @@ import re
 import matplotlib.pyplot as plt
 from dateutil.rrule import rrule,DAILY,MONTHLY,YEARLY,WEEKLY
 import random
-path = ''
+path = "TestData"
 cache = []
 
 def load_messages(path):
@@ -22,6 +22,9 @@ def load_messages(path):
         i+=1
     cache = sorted(data, key=lambda message : message['timestamp_ms'])
     return cache
+
+def deEmojify(inputString):
+    return inputString.encode('ascii', 'ignore').decode('ascii')
 
 def decode(s):
     try:
@@ -153,6 +156,32 @@ def random_message(messages):
             flag = False
     return decode(msg['sender_name'] + ' : ' + msg['content'])
 
+def most_used_words(messages,maxRank = 20,excluded=[],start=None,end=None):
+    count = {}
+    start,end = get_start_end(messages,start,end,get_signature(DAILY))
+    for msg in messages:
+        if 'content' in msg:
+            date = datetime.datetime.fromtimestamp(msg['timestamp_ms']/1000.0)
+            if date < start:
+                continue
+            if date > end:
+                break
+            content = deEmojify(decode(msg['content'])).lower()
+            contentNoPunct = content.translate(str.maketrans('', '', string.punctuation))
+            words = contentNoPunct.strip(' ').split(' ')
+            for word in words:
+                if word not in excluded:
+                    if word in count:
+                        count[word]+=1
+                    else:
+                        count[word] = 1
+    
+    #print(sorted([[key,value] for key,value in count.items()],key = lambda x: x[1],reverse=True)[:20])
+    X,Y = [list(a) for a in zip(*sorted([[key,value] for key,value in count.items()],key = lambda x: x[1],reverse=True)) ]
+    plt.bar(X[:maxRank],Y[:maxRank])
+    plt.xticks(rotation=45, ha='right')
+    plt.show()
+
 def search_keyword_random(messages,keyword=None):
     match = []
     if not keyword:
@@ -173,6 +202,8 @@ data = load_messages(path)
 #    word = str(input())
 #    print(search_keyword_random(data,word))
 
-while True:
-    print(random_message(data))
-    input()
+#while True:
+#    print(random_message(data))
+#    input()
+mots = ['','je','a','pas','de','que','tu','mais','Je','le','en','et','la','me','un','te','du','des']
+most_used_words(data,excluded=mots)
